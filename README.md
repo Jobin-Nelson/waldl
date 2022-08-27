@@ -18,6 +18,11 @@ eg: `/home/jobin/Pictures/Wallpapers/aug_15/`
 3. Move the binary to somewhere in your `$PATH` variable, for me it is `$HOME/script/`
     - `mv target/release/waldl ~/script/`
 
+## Usage
+
+If you don't give any arguments it will download latest or top lists.
+
+`waldl Matthew McConaughey`
 
 ## Dependencies
 
