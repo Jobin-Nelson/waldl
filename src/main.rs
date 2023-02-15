@@ -14,7 +14,7 @@ async fn main() -> Result<(), reqwest::Error> {
 }
 
 async fn get_wallpaper_links(args: &String) -> Result<Vec<String>, reqwest::Error> {
-    let search_url = if args == "" {
+    let search_url = if args.is_empty() {
         String::from("https://wallhaven.cc/api/v1/search")
     } else {
         reqwest::Url::parse_with_params("https://wallhaven.cc/api/v1/search", &[("q", args)])
@@ -33,7 +33,7 @@ async fn get_wallpaper_links(args: &String) -> Result<Vec<String>, reqwest::Erro
     Ok(wallpaper_links)
 }
 
-async fn download_wallpaper(wallpaper_links: Vec<String>) -> () {
+async fn download_wallpaper(wallpaper_links: Vec<String>) {
     let today = chrono::Utc::now()
         .format("%b_%d")
         .to_string()
@@ -41,8 +41,7 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) -> () {
 
     let wallpaper_path: PathBuf = ["/home/jobin/Pictures/wallpapers", &today].iter().collect();
 
-    std::fs::create_dir_all(wallpaper_path.as_path())
-        .expect("Could not create directory");
+    std::fs::create_dir_all(wallpaper_path.as_path()).expect("Could not create directory");
 
     let tasks = FuturesUnordered::new();
 
@@ -54,8 +53,7 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) -> () {
                 Ok(response) => {
                     let file_name = Path::new(&link).file_name().unwrap();
                     let file_path = wallpaper_path.join(file_name);
-                    if let Ok(_) =
-                        std::fs::write(file_path.as_path(), response.bytes().await.unwrap())
+                    if std::fs::write(file_path.as_path(), response.bytes().await.unwrap()).is_ok()
                     {
                         println!("Downloading file {}", link);
                     } else {
