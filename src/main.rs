@@ -1,8 +1,6 @@
-// use futures::{stream, StreamExt};
 use futures::future::join_all;
+use futures::stream::FuturesUnordered;
 use std::path::{Path, PathBuf};
-use tokio::fs;
-use tokio::task::JoinHandle;
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
@@ -41,40 +39,12 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) -> () {
         .to_string()
         .to_ascii_lowercase();
 
-    let wallpaper_path: PathBuf = ["/home/jobin/Pictures/Wallpapers", &today].iter().collect();
+    let wallpaper_path: PathBuf = ["/home/jobin/Pictures/wallpapers", &today].iter().collect();
 
-    fs::create_dir_all(wallpaper_path.as_path())
-        .await
+    std::fs::create_dir_all(wallpaper_path.as_path())
         .expect("Could not create directory");
 
-    // let client = reqwest::Client::new();
-    // // let buffer_number = wallpaper_links.len();
-    //
-    // let responses = stream::iter(wallpaper_links).map(|url| {
-    //     let client = client.clone();
-    //     tokio::spawn(async move {
-    //         let response = client.get(url).send().await?;
-    //         response.bytes().await
-    //     })
-    // }).buffer_unordered(8);
-    //
-    // responses.enumerate().for_each(|(i, b)| async move {
-    //     match b {
-    //         Ok(Ok(b)) => {
-    //             let file_path = "/home/jobin/Pictures/Wallpapers/aug_22/wallhaven_".to_owned() + &i.to_string();
-    //             let file_name = Path::new(&file_path).file_name().unwrap();
-    //             if let Ok(_) = fs::write(&file_path, b).await {
-    //                 println!("Downloading file {}", file_name.to_str().unwrap());
-    //             } else {
-    //                 println!("Could not download skipping image");
-    //             };
-    //         },
-    //         Ok(Err(e)) => eprintln!("Couldn't download image {}", e),
-    //         Err(e) => eprintln!("Couldn't join tokio::JoinError {}", e),
-    //     }
-    // }).await;
-
-    let mut tasks: Vec<JoinHandle<()>> = Vec::new();
+    let tasks = FuturesUnordered::new();
 
     for link in wallpaper_links {
         let wallpaper_path = wallpaper_path.clone();
@@ -85,7 +55,7 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) -> () {
                     let file_name = Path::new(&link).file_name().unwrap();
                     let file_path = wallpaper_path.join(file_name);
                     if let Ok(_) =
-                        fs::write(file_path.as_path(), response.bytes().await.unwrap()).await
+                        std::fs::write(file_path.as_path(), response.bytes().await.unwrap())
                     {
                         println!("Downloading file {}", link);
                     } else {
