@@ -67,6 +67,7 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) {
                     let mut cursor = std::io::Cursor::new(response.bytes().await.unwrap());
                     if copy(&mut cursor, &mut fname).await.is_err() {
                         eprintln!("Could not write image to file {:?}", file_path.file_name());
+                        return;
                     }
                     println!("Downloaded image to {}", file_path.to_string_lossy());
                 }
