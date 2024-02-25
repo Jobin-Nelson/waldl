@@ -1,19 +1,19 @@
-use futures::future::join_all;
-use futures::stream::FuturesUnordered;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use tokio::io::copy;
+use tokio::task::JoinSet;
 
 #[tokio::main]
-async fn main() -> Result<(), reqwest::Error> {
-    let args = &std::env::args().collect::<Vec<String>>()[1..].join(" ");
+async fn main() {
+    let args = std::env::args().collect::<Vec<String>>()[1..].join(" ");
 
-    let wallpaper_links = get_wallpaper_links(args).await?;
-
+    let Ok(wallpaper_links) = get_wallpaper_links(&args).await else {
+        eprintln!("Error occured getting wallpaper links from wallhaven");
+        return;
+    };
     download_wallpaper(wallpaper_links).await;
-
-    Ok(())
 }
 
-async fn get_wallpaper_links(args: &String) -> Result<Vec<String>, reqwest::Error> {
+async fn get_wallpaper_links(args: &str) -> Result<Vec<String>, reqwest::Error> {
     let search_url = if args.is_empty() {
         String::from("https://wallhaven.cc/api/v1/search")
     } else {
@@ -23,14 +23,12 @@ async fn get_wallpaper_links(args: &String) -> Result<Vec<String>, reqwest::Erro
     };
 
     let response: serde_json::Value = reqwest::get(&search_url).await?.json().await?;
-
-    let mut wallpaper_links: Vec<String> = Vec::new();
-
-    for wallpaper in response["data"].as_array().unwrap() {
-        wallpaper_links.push(wallpaper["path"].as_str().unwrap().to_owned());
-    }
-
-    Ok(wallpaper_links)
+    Ok(response["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["path"].as_str().unwrap().to_owned())
+        .collect())
 }
 
 async fn download_wallpaper(wallpaper_links: Vec<String>) {
@@ -41,32 +39,44 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) {
 
     let wallpaper_path: PathBuf = ["/home/jobin/Pictures/wallpapers", &today].iter().collect();
 
-    std::fs::create_dir_all(wallpaper_path.as_path()).expect("Could not create directory");
+    tokio::fs::create_dir_all(wallpaper_path.as_path())
+        .await
+        .expect("Could not create directory");
 
-    let tasks = FuturesUnordered::new();
+    let mut set = JoinSet::new();
+    let client = reqwest::Client::new();
 
     for link in wallpaper_links {
+        let client = client.clone();
         let wallpaper_path = wallpaper_path.clone();
 
-        tasks.push(tokio::spawn(async move {
-            match reqwest::get(&link).await {
+        set.spawn(async move {
+            match client.get(&link).send().await {
                 Ok(response) => {
-                    let file_name = Path::new(&link).file_name().unwrap();
+                    let file_name = response
+                        .url()
+                        .path_segments()
+                        .and_then(|segment| segment.last())
+                        .and_then(|name| if name.is_empty() { None } else { Some(name) })
+                        .unwrap_or("tmp.bin");
                     let file_path = wallpaper_path.join(file_name);
-                    if std::fs::write(file_path.as_path(), response.bytes().await.unwrap()).is_ok()
-                    {
-                        println!("Downloading file {}", link);
-                    } else {
-                        println!("Could not write image {} to file", link);
+                    let Ok(mut fname) = tokio::fs::File::create(&file_path).await else {
+                        eprintln!("Could not create file {:?}", file_path.file_name());
+                        return;
+                    };
+                    let mut cursor = std::io::Cursor::new(response.bytes().await.unwrap());
+                    if copy(&mut cursor, &mut fname).await.is_err() {
+                        eprintln!("Could not write image to file {:?}", file_path.file_name());
                     }
+                    println!("Downloaded image to {}", file_path.to_string_lossy());
                 }
-                Err(_) => {
-                    println!("Could not download image from {}", link);
-                }
+                Err(_) => println!("Could not download image from {}", link),
             }
-        }))
+        });
     }
 
-    println!("Started {} tasks. Waiting...", tasks.len());
-    join_all(tasks).await;
+    println!("Started {} tasks. Waiting...", set.len());
+    while let Some(res) = set.join_next().await {
+        res.unwrap();
+    }
 }
