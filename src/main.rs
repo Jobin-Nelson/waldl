@@ -51,28 +51,28 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) {
         let wallpaper_path = wallpaper_path.clone();
 
         set.spawn(async move {
-            match client.get(&link).send().await {
-                Ok(response) => {
-                    let file_name = response
-                        .url()
-                        .path_segments()
-                        .and_then(|segment| segment.last())
-                        .and_then(|name| if name.is_empty() { None } else { Some(name) })
-                        .unwrap_or("tmp.bin");
-                    let file_path = wallpaper_path.join(file_name);
-                    let Ok(mut fname) = tokio::fs::File::create(&file_path).await else {
-                        eprintln!("Could not create file {:?}", file_path.file_name());
-                        return;
-                    };
-                    let mut cursor = std::io::Cursor::new(response.bytes().await.unwrap());
-                    if copy(&mut cursor, &mut fname).await.is_err() {
-                        eprintln!("Could not write image to file {:?}", file_path.file_name());
-                        return;
-                    }
-                    println!("Downloaded image to {}", file_path.to_string_lossy());
-                }
-                Err(_) => println!("Could not download image from {}", link),
+            let Ok(response) = client.get(&link).send().await else {
+                eprintln!("Could not download image from {}", link);
+                return;
+            };
+            let file_name = response
+                .url()
+                .path_segments()
+                .and_then(|segment| segment.last())
+                .and_then(|name| if name.is_empty() { None } else { Some(name) })
+                .unwrap_or("tmp.bin");
+            let file_path = wallpaper_path.join(file_name);
+            let Ok(mut fname) = tokio::fs::File::create(&file_path).await else {
+                eprintln!("Could not create file {:?}", file_path.file_name());
+                return;
+            };
+            let mut cursor = std::io::Cursor::new(response.bytes().await.unwrap());
+            if copy(&mut cursor, &mut fname).await.is_err() {
+                eprintln!("Could not write image to file {:?}", file_path.file_name());
+                return;
             }
+            println!("Downloaded image to {}", file_path.to_string_lossy());
+        
         });
     }
 
