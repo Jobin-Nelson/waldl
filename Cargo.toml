@@ -2,7 +2,7 @@
 name = "waldl"
 description = "A command line wallpaper downloader"
 author = "Jobin Nelson"
-version = "0.2.0"
+version = "0.2.1"
 repository = "https://github.com/jobin-nelson/waldl"
 license = "MIT"
 edition = "2021"

@@ -33,7 +33,7 @@ async fn get_wallpaper_links(args: &str) -> Result<Vec<String>, reqwest::Error> 
 
 async fn download_wallpaper(wallpaper_links: Vec<String>) {
     let today = chrono::Utc::now()
-        .format("%b_%d")
+        .format("%F")
         .to_string()
         .to_ascii_lowercase();
 
