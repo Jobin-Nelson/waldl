@@ -1,5 +1,6 @@
+use std::io::BufReader;
 use std::path::PathBuf;
-use tokio::io::copy;
+use tokio::io::{copy, BufReader, BufWriter};
 use tokio::task::JoinSet;
 
 #[tokio::main]
@@ -37,7 +38,12 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) {
         .to_string()
         .to_ascii_lowercase();
 
-    let wallpaper_path: PathBuf = ["/home/jobin/Pictures/wallpapers", &today].iter().collect();
+    let wallpaper_path: PathBuf = [
+        &std::env::var("HOME").unwrap(),
+        "Pictures",
+        "wallpapers",
+        &today
+    ].iter().collect();
 
     tokio::fs::create_dir_all(wallpaper_path.as_path())
         .await
@@ -66,13 +72,15 @@ async fn download_wallpaper(wallpaper_links: Vec<String>) {
                 eprintln!("Could not create file {:?}", file_path.file_name());
                 return;
             };
-            let mut cursor = std::io::Cursor::new(response.bytes().await.unwrap());
-            if copy(&mut cursor, &mut fname).await.is_err() {
+            let data = response.bytes().await.unwrap();
+            if copy(&mut BufReader::new(data), &mut BufWriter::new(fname))
+                .await
+                .is_err()
+            {
                 eprintln!("Could not write image to file {:?}", file_path.file_name());
                 return;
             }
             println!("Downloaded image to {}", file_path.to_string_lossy());
-        
         });
     }
 
